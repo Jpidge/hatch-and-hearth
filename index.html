@@ -70,7 +70,7 @@
   .stage-wrap .big-glyph{width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:120px; background:radial-gradient(80% 80% at 50% 30%, var(--surface), var(--surface-alt))}
   .bob{animation:bob 3.4s ease-in-out infinite; will-change:transform}
   @keyframes bob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10px) scale(1.015)}}
-  .eyelid{position:absolute; border-radius:50%; pointer-events:none; background:rgba(24,15,8,.42); -webkit-backdrop-filter:brightness(.42) saturate(.75) blur(1.6px); backdrop-filter:brightness(.42) saturate(.75) blur(1.6px); -webkit-mask-image:radial-gradient(closest-side, #000 52%, transparent 98%); mask-image:radial-gradient(closest-side, #000 52%, transparent 98%); transform-origin:50% 0; transform:scaleY(0); animation:eyelid 5.2s infinite}
+  .eyelid{position:absolute; border-radius:50%; pointer-events:none; box-shadow:inset 0 -7px 9px -5px rgba(43,28,12,.55), inset 0 3px 6px -3px rgba(255,255,255,.25); -webkit-mask-image:radial-gradient(closest-side, #000 55%, transparent 98%); mask-image:radial-gradient(closest-side, #000 55%, transparent 98%); transform-origin:50% 0; transform:scaleY(0); animation:eyelid 5.2s infinite}
   @keyframes eyelid{0%,92%,100%{transform:scaleY(0)}94.5%,96%{transform:scaleY(1.06)}98.5%{transform:scaleY(0)}}
   .eyelid.closed{animation:none; transform:scaleY(1.06)}
   .bubble{background:var(--surface-alt); color:var(--text); border-radius:14px; padding:10px 12px; font-size:15px; margin:12px 0 0; position:relative}
@@ -626,13 +626,15 @@ const EYE_MAP = {
   "cog-quill-hedgehog": [[[47.4,42.5,53.3,48.3],[64.8,41.8,69.1,47.2]]],
   "tinker-mole": [[[45.9,30.7,50.6,35.3],[62.4,29.4,65.3,33.7]]]
 };
+const LID_COLORS = {"seedling-sprite": [["#92824d", "#ada55c"]], "moth-dragon": [["#1a1a0d", "#815f44"], ["#0f0d1b", "#8b705f"], ["#68493a", "#29172d"], ["#6d5243", "#4d262a"]], "thorntiger": [["#9d6c3b", "#e9b472"]], "pocket-tortoise": [["#b1815f", "#a4826b"], ["#9d6e3a", "#a07f66"], ["#8c5a34", "#b99173"], ["#6f4a25", "#996c4c"]], "wind-up-wren": [["#c18d61", "#543530"]], "sporecap-woodfrog": [["#9e572b", "#946039"]], "fern-owl": [["#352d0e", "#b39552"], ["#5a4f25", "#c4a560"], ["#6f6835", "#87803f"], ["#5a583a", "#807b41"]], "sprocket-fox": [["#e1863d", "#9b4f23"], ["#ed934d", "#b45b2a"], ["#c26631", "#af7251"], ["#b2612f", "#9a654e"]], "lotus-drake": [["#5f5b4b", "#c8b592"]], "lupulin-fae": [["#706939", "#a49859"]], "button-bear": [["#a66942", "#b6794d"]], "cog-quill-hedgehog": [["#9c7a5c", "#e6c092"]], "tinker-mole": [["#644126", "#885e3f"]]};
 function renderEyes(pet, sp, st){
   const box = $("eyes"); if(!box) return;
   const stages = EYE_MAP[sp.id]; const eyes = stages ? (sp.arts ? stages[st] : stages[0]) : null;
   if(!eyes){ box.innerHTML = ""; return; }
-  box.innerHTML = eyes.map(([x1,y1,x2,y2]) => {
+  const cols = (LID_COLORS[sp.id] || [])[sp.arts ? st : 0] || [];
+  box.innerHTML = eyes.map(([x1,y1,x2,y2], i) => {
     const cx = (x1+x2)/2, cy = (y1+y2)/2, w = (x2-x1)*1.4, h = (y2-y1)*1.6;
-    return `<div class="eyelid${pet.dormant ? " closed" : ""}" style="left:${(cx-w/2).toFixed(1)}%; top:${(cy-h/2).toFixed(1)}%; width:${w.toFixed(1)}%; height:${h.toFixed(1)}%"></div>`;
+    return `<div class="eyelid${pet.dormant ? " closed" : ""}" style="left:${(cx-w/2).toFixed(1)}%; top:${(cy-h/2).toFixed(1)}%; width:${w.toFixed(1)}%; height:${h.toFixed(1)}%; background:${cols[i] || "#8a7358"}"></div>`;
   }).join("");
 }
 function renderPet(){

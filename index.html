@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#241a26">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>Hatch &amp; Hearth — Phase 2 test build</title>
 <style>
   :root{
@@ -647,6 +650,9 @@ rolloverAll();
 if(S && pendingPet()) renderName();
 else if(S && S.pets.length) renderPet();
 else { S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); }
+if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 setInterval(() => {
   if(!S) return;
   const sig = () => S.pets.map(p => (p.dormant ? "D" : "A") + p.day.date).join("|") + "@" + todayStr();

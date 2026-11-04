@@ -163,7 +163,7 @@
     <div class="card hidden" id="wakeCard" style="text-align:center">
       <div style="font-size:40px">💤</div>
       <h3 style="margin:6px 0 4px">Fast asleep</h3>
-      <p class="sub" style="margin:0 0 12px">Day after day of empty bars, so this one has drifted off to sleep. Nothing is wrong and nothing was lost — XP, stage and trinkets are exactly where they were left. Waking is free, always.</p>
+      <p class="sub" style="margin:0 0 12px">Both bars bottomed out, so this one has drifted off to sleep. Nothing is wrong and nothing was lost — XP, stage and trinkets are exactly where they were left. Waking is instant and free — but they'll wake groggy, bars low, until a few days of care bring them back.</p>
       <button id="btnWake">Wake them up</button>
     </div>
 
@@ -225,9 +225,15 @@
 /* ================= DATA ================= */
 const STAGES = ["Hatchling","Sproutwing","Lanternwing","Grand Clockwork"];
 const THRESHOLDS = [0, 480, 1920, 6720]; // stage spans 3 / 9 / 30 perfect-care days — full maturity ≈ 6 weeks (John, 2026-11-04)
-const DORMANCY_ZERO_DAYS = 7; // Dormancy is meter-driven (John's clarification, 2026-11-04): a pet goes dormant
-// after this many consecutive days that closed with BOTH bars at zero (a day with zero care
-// of any kind). Any care at all breaks the streak. 7 is Rowan's proposed default — John's to settle.
+// Reservoir meters (John's model, 2026-11-04): bars are 0–100 and persist across days.
+// Each rollover, a bar drains by DRAIN_PER_DAY × the share of its care that was missed that
+// day — total neglect zeroes a bar in 4 days, partial care slows the fall proportionally.
+// A full day of counted care refills FILL_PER_DAY, so a pet woken groggy at WAKE_BARS is
+// back to full in about three days of good care. Dormant when BOTH bars reach zero.
+const DRAIN_PER_DAY = 25;
+const FILL_PER_DAY = 34;
+const WAKE_BARS = 10;   // wake instantly, but groggy (John, 2026-11-04)
+const HATCH_BARS = 60;  // newborns start mid-bar: healthy, and already needing you
 /* Lineup per the approved plan (12 species). Art lands hatchling-first;
    species without a portrait yet show their glyph until their art day. */
 const SPECIES = [
@@ -288,6 +294,7 @@ const LINES = {
   first:["*one small tick* …oh. You're the one who winds me. Hello."],
   dormant:["💤 …the faintest ticking, far away. Fast asleep, perfectly safe."],
   woke:["*click… click…* Oh. Oh! You're here. I was dreaming the whole time."],
+  droop:["*slow tick…* Everything feels heavy today.","I saved you a smile. It's a small one.","*yawn* …sorry. I'm here. Mostly.","The lantern's low. So am I, a little."],
 };
 
 /* ================= STATE ================= */
@@ -312,7 +319,7 @@ function mkPet(speciesId, customDesc){
   return { id:"p" + Date.now().toString(36) + Math.floor(Math.random()*999),
            speciesId, customDesc: customDesc || null,
            name:"", xp:0, hatchedAt:new Date().toISOString(),
-           lastCare: todayStr(), dormant:false, zeroStreak:0, day: freshDay() };
+           lastCare: todayStr(), dormant:false, health: HATCH_BARS, happy: HATCH_BARS, day: freshDay() };
 }
 function blankState(){
   return { pets:[], activeId:null, pendingNameId:null,
@@ -330,6 +337,10 @@ function ensure(){
     save();
   }
   if(!Array.isArray(S.pets)) S.pets = [];
+  S.pets.forEach(p => { // normalize saves from earlier test builds
+    if(typeof p.health !== "number") p.health = HATCH_BARS;
+    if(typeof p.happy !== "number") p.happy = HATCH_BARS;
+  });
 }
 function activePet(){
   if(!S || !S.pets.length) return null;
@@ -352,14 +363,20 @@ function rolloverAll(){
   if(!S) return;
   const t = todayStr();
   S.pets.forEach(p => {
-    if(typeof p.zeroStreak !== "number") p.zeroStreak = 0;
-    if(!p.dormant && p.day.date !== t){
-      // Judge the day that just closed: both bars at zero = not one care action all day.
-      const closedAtZero = NEEDS.every(n => (p.day.counts[n.id] || 0) === 0);
-      p.zeroStreak = closedAtZero ? p.zeroStreak + 1 : 0;
-      if(p.zeroStreak >= DORMANCY_ZERO_DAYS) p.dormant = true;
-      else p.day = freshDay();
-    }
+    if(p.dormant || p.day.date === t) return;
+    const gap = Math.max(1, daysBetween(p.day.date, t));
+    const drainFor = (counts, body) => {
+      const ns = NEEDS.filter(n => n.body === body);
+      const tot = ns.reduce((a,n) => a + n.target, 0);
+      const got = ns.reduce((a,n) => a + Math.min(counts[n.id] || 0, n.target), 0);
+      return DRAIN_PER_DAY * (1 - got / tot);
+    };
+    p.health -= drainFor(p.day.counts, true);
+    p.happy  -= drainFor(p.day.counts, false);
+    for(let i = 1; i < gap; i++){ p.health -= DRAIN_PER_DAY; p.happy -= DRAIN_PER_DAY; } // whole missed days drain full
+    p.health = Math.max(0, p.health); p.happy = Math.max(0, p.happy);
+    if(p.health <= 0 && p.happy <= 0){ p.health = 0; p.happy = 0; p.dormant = true; }
+    else p.day = freshDay();
   });
   save();
 }
@@ -473,6 +490,7 @@ function say(kind){ currentLine = kind; renderPet(); }
 function pickLine(pet){
   if(currentLine) { const l = LINES[currentLine]; currentLine = null; return l[Math.floor(Math.random()*l.length)]; }
   if(pet.xp === 0) return LINES.first[0];
+  if(Math.min(pet.health, pet.happy) < 40 && Math.random() < .75) return LINES.droop[Math.floor(Math.random()*LINES.droop.length)];
   if(allMet(pet)) return LINES.alldone[Math.floor(Math.random()*LINES.alldone.length)];
   if(!pet.day.wishDone && Math.random() < .5) return LINES.wish[0];
   const h = new Date().getHours();
@@ -500,10 +518,11 @@ function renderPet(){
   if(next){ $("xpFill").style.width = Math.min(100, (pet.xp - cur) / (next - cur) * 100) + "%";
     $("xpText").textContent = pet.xp.toLocaleString() + " XP · " + (next - pet.xp).toLocaleString() + " to " + STAGES[st+1]; }
   else { $("xpFill").style.width = "100%"; $("xpText").textContent = pet.xp.toLocaleString() + " XP · fully grown"; }
-  const body = NEEDS.filter(n => n.body), heart = NEEDS.filter(n => !n.body);
-  const pct = ns => Math.round(100 * ns.reduce((a,n) => a + Math.min(pet.day.counts[n.id]||0, n.target), 0) / ns.reduce((a,n) => a + n.target, 0));
-  $("healthFill").style.width = pct(body) + "%"; $("healthNum").textContent = pct(body) + "%";
-  $("happyFill").style.width = pct(heart) + "%"; $("happyNum").textContent = pct(heart) + "%";
+  const hp = Math.round(pet.health), xp2 = Math.round(pet.happy);
+  $("healthFill").style.width = hp + "%"; $("healthNum").textContent = hp + "%";
+  $("happyFill").style.width = xp2 + "%"; $("happyNum").textContent = xp2 + "%";
+  const low = Math.min(pet.health, pet.happy);
+  document.querySelector(".stage-wrap").style.animationDuration = (low > 60 ? 4 : low >= 25 ? 6.5 : 9.5) + "s"; // the fade is visible: lower bars, slower bob
   $("wakeCard").classList.toggle("hidden", !pet.dormant);
   $("careCard").classList.toggle("hidden", pet.dormant);
   const wish = NEEDS.find(n => n.id === pet.day.wish);
@@ -541,11 +560,14 @@ function doCare(needId){
   const sp = speciesOf(pet);
   const n = NEEDS.find(x => x.id === needId);
   const before = stageOf(pet.xp);
-  pet.lastCare = todayStr(); pet.zeroStreak = 0;
+  pet.lastCare = todayStr();
   pet.day.counts[needId] = (pet.day.counts[needId] || 0) + 1;
   const c = pet.day.counts[needId];
   let gained = 0;
-  if(c <= n.target) gained = 10;                 /* past target: 0 XP — the public anti-grind rule */
+  if(c <= n.target){ gained = 10;                /* past target: 0 XP — the public anti-grind rule */
+    const barKey = n.body ? "health" : "happy";
+    const barTotal = NEEDS.filter(x => x.body === n.body).reduce((a,x) => a + x.target, 0);
+    pet[barKey] = Math.min(100, pet[barKey] + FILL_PER_DAY / barTotal); }
   if(pet.day.wish === needId && !pet.day.wishDone && c >= 1){ pet.day.wishDone = true; S.trinkets += 1; currentLine = "thanks"; }
   if(allMet(pet) && !pet.day.bonusPaid){
     pet.day.bonusPaid = true; gained += 50;
@@ -585,7 +607,7 @@ $("btnNameBack").onclick = () => {
 };
 $("btnWake").onclick = () => {
   const pet = activePet(); if(!pet) return;
-  pet.dormant = false; pet.lastCare = todayStr(); pet.zeroStreak = 0; pet.day = freshDay();
+  pet.dormant = false; pet.lastCare = todayStr(); pet.health = WAKE_BARS; pet.happy = WAKE_BARS; pet.day = freshDay();
   currentLine = "woke"; save();
   banner("☀️ " + (pet.name || "Your pet") + " wakes up, right where you left them.");
   renderPet();

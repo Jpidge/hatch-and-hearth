@@ -231,6 +231,7 @@
     </div>
 
     <div id="panel-log" class="hidden">
+    <div class="card" id="accountBox"></div>
     <div class="card">
       <h3 style="margin:0 0 8px; font-size:15px">Nest log</h3>
       <p class="sub" id="nestStats" style="margin:0 0 10px">—</p>
@@ -266,6 +267,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 "use strict";
 /* ================= DATA ================= */
@@ -744,6 +746,64 @@ setInterval(() => {
   const before = sig(); rolloverAll();
   if(sig() !== before && !$("view-pet").classList.contains("hidden")) renderPet();
 }, 60000);
+
+/* ================= SUPABASE SYNC (Phase 3, slice 1: auth + nest) ================= */
+const SB_URL = "https://jhzzrynvuyxdfimbtztc.supabase.co";
+const SB_KEY = "sb_publishable_pysxEIVvGeE9X2axPGj8gQ_Gads9LEh";
+let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null;
+try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; }
+const _saveLocal = save;
+save = function(){ _saveLocal(); sbDirty = true; clearTimeout(sbTimer); sbTimer = setTimeout(sbPush, 900); };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function petToRow(p){ return { id:p.id, owner:SB_USER.id, species_id:p.speciesId, custom_desc:p.customDesc || null, seasonal_key:p.seasonalKey || null, name:p.name || "", xp:p.xp, health:p.health, happy:p.happy, dormant:p.dormant, day_counts:p.day.counts || {}, day_wish:p.day.wish || null, day_wish_done:!!p.day.wishDone, day_bonus_paid:!!p.day.bonusPaid, day_date:p.day.date, hatched_at:p.hatchedAt || new Date().toISOString(), last_care_date:p.lastCare || null, has_bred:!!p.hasBred }; }
+function rowToPet(r){ return { id:r.id, speciesId:r.species_id, customDesc:r.custom_desc || undefined, seasonalKey:r.seasonal_key || undefined, name:r.name, xp:r.xp, health:Number(r.health), happy:Number(r.happy), dormant:r.dormant, day:{ date:r.day_date, counts:r.day_counts || {}, wish:r.day_wish || undefined, wishDone:r.day_wish_done, bonusPaid:r.day_bonus_paid }, hatchedAt:r.hatched_at, lastCare:r.last_care_date || undefined, hasBred:r.has_bred }; }
+async function sbPush(){
+  if(!sb || !SB_USER || !S || !sbDirty) return; sbDirty = false;
+  try{
+    for(const p of S.pets){ if(!UUID_RE.test(p.id)){ const nid = crypto.randomUUID(); if(S.activeId === p.id) S.activeId = nid; if(S.pendingNameId === p.id) S.pendingNameId = nid; p.id = nid; _saveLocal(); } }
+    await sb.from("profiles").upsert({ id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null });
+    if(S.pets.length) await sb.from("pets").upsert(S.pets.map(petToRow));
+    const st = $("sbStatus"); if(st) st.textContent = "✓ Synced just now";
+  }catch(e){ sbDirty = true; }
+}
+async function sbPullOrMigrate(){
+  if(!sb || !SB_USER || sbPulledFor === SB_USER.id) return; sbPulledFor = SB_USER.id;
+  try{
+    const { data:rows } = await sb.from("pets").select("*").eq("owner", SB_USER.id).order("hatched_at");
+    if(rows && rows.length){
+      const keepActive = S && S.activeId;
+      S = S || { pets:[], activeId:null, pendingNameId:null, log:[], streak:0, careDays:0, lastCareDate:null, trinkets:0 };
+      S.pets = rows.map(rowToPet);
+      if(!S.pets.some(p => p.id === keepActive)) S.activeId = S.pets[0].id;
+      const { data:prof } = await sb.from("profiles").select("*").eq("id", SB_USER.id).maybeSingle();
+      if(prof){ S.trinkets = prof.trinkets || 0; S.streak = prof.streak || 0; S.careDays = prof.care_days || 0; S.lastCareDate = prof.last_full_care_date || null; }
+      _saveLocal(); rolloverAll();
+      if(S.pendingNameId && S.pets.some(p => p.id === S.pendingNameId)) renderName(); else renderPet();
+    } else if(S && S.pets.length && !localStorage.getItem("hh-migrated-" + SB_USER.id)){
+      sbDirty = true; await sbPush(); localStorage.setItem("hh-migrated-" + SB_USER.id, "1");
+      banner("☁️ Your nest now lives in your account — it follows you to any device.");
+    }
+  }catch(e){}
+  renderAccount();
+}
+function renderAccount(){
+  const box = $("accountBox"); if(!box) return;
+  if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p>"; return; }
+  if(SB_USER){
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button>`;
+    $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; renderAccount(); };
+  } else {
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
+    $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
+  }
+}
+async function sbInit(){
+  renderAccount(); if(!sb) return;
+  const { data } = await sb.auth.getSession(); SB_USER = data.session ? data.session.user : null; renderAccount();
+  if(SB_USER) sbPullOrMigrate();
+  sb.auth.onAuthStateChange((_ev, session) => { SB_USER = session ? session.user : null; renderAccount(); if(SB_USER) sbPullOrMigrate(); });
+}
+sbInit();
 </script>
 </body>
 </html>

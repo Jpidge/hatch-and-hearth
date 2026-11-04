@@ -163,7 +163,7 @@
     <div class="card hidden" id="wakeCard" style="text-align:center">
       <div style="font-size:40px">💤</div>
       <h3 style="margin:6px 0 4px">Fast asleep</h3>
-      <p class="sub" style="margin:0 0 12px">Two weeks without care, so this one has gone dormant. Nothing is wrong and nothing was lost — XP, stage and trinkets are exactly where they were left. Waking is free, always.</p>
+      <p class="sub" style="margin:0 0 12px">Day after day of empty bars, so this one has drifted off to sleep. Nothing is wrong and nothing was lost — XP, stage and trinkets are exactly where they were left. Waking is free, always.</p>
       <button id="btnWake">Wake them up</button>
     </div>
 
@@ -225,7 +225,9 @@
 /* ================= DATA ================= */
 const STAGES = ["Hatchling","Sproutwing","Lanternwing","Grand Clockwork"];
 const THRESHOLDS = [0, 480, 1920, 6720]; // stage spans 3 / 9 / 30 perfect-care days — full maturity ≈ 6 weeks (John, 2026-11-04)
-const DORMANCY_DAYS = 14; // 2 weeks uncared → dormant (confirmed by John 2026-11-04; a possible short post-dormancy wake window is an open question with him — until he rules, waking is always available and free)
+const DORMANCY_ZERO_DAYS = 7; // Dormancy is meter-driven (John's clarification, 2026-11-04): a pet goes dormant
+// after this many consecutive days that closed with BOTH bars at zero (a day with zero care
+// of any kind). Any care at all breaks the streak. 7 is Rowan's proposed default — John's to settle.
 /* Lineup per the approved plan (12 species). Art lands hatchling-first;
    species without a portrait yet show their glyph until their art day. */
 const SPECIES = [
@@ -310,7 +312,7 @@ function mkPet(speciesId, customDesc){
   return { id:"p" + Date.now().toString(36) + Math.floor(Math.random()*999),
            speciesId, customDesc: customDesc || null,
            name:"", xp:0, hatchedAt:new Date().toISOString(),
-           lastCare: todayStr(), dormant:false, day: freshDay() };
+           lastCare: todayStr(), dormant:false, zeroStreak:0, day: freshDay() };
 }
 function blankState(){
   return { pets:[], activeId:null, pendingNameId:null,
@@ -350,8 +352,14 @@ function rolloverAll(){
   if(!S) return;
   const t = todayStr();
   S.pets.forEach(p => {
-    if(!p.dormant && daysBetween(p.lastCare, t) >= DORMANCY_DAYS) p.dormant = true;
-    if(!p.dormant && p.day.date !== t) p.day = freshDay();
+    if(typeof p.zeroStreak !== "number") p.zeroStreak = 0;
+    if(!p.dormant && p.day.date !== t){
+      // Judge the day that just closed: both bars at zero = not one care action all day.
+      const closedAtZero = NEEDS.every(n => (p.day.counts[n.id] || 0) === 0);
+      p.zeroStreak = closedAtZero ? p.zeroStreak + 1 : 0;
+      if(p.zeroStreak >= DORMANCY_ZERO_DAYS) p.dormant = true;
+      else p.day = freshDay();
+    }
   });
   save();
 }
@@ -533,7 +541,7 @@ function doCare(needId){
   const sp = speciesOf(pet);
   const n = NEEDS.find(x => x.id === needId);
   const before = stageOf(pet.xp);
-  pet.lastCare = todayStr();
+  pet.lastCare = todayStr(); pet.zeroStreak = 0;
   pet.day.counts[needId] = (pet.day.counts[needId] || 0) + 1;
   const c = pet.day.counts[needId];
   let gained = 0;
@@ -577,7 +585,7 @@ $("btnNameBack").onclick = () => {
 };
 $("btnWake").onclick = () => {
   const pet = activePet(); if(!pet) return;
-  pet.dormant = false; pet.lastCare = todayStr(); pet.day = freshDay();
+  pet.dormant = false; pet.lastCare = todayStr(); pet.zeroStreak = 0; pet.day = freshDay();
   currentLine = "woke"; save();
   banner("☀️ " + (pet.name || "Your pet") + " wakes up, right where you left them.");
   renderPet();

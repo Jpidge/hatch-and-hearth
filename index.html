@@ -536,6 +536,7 @@ function renderNest(){
 /* ================= TABS + NEST GRID ================= */
 let TAB = "pet";
 function switchTab(tab){
+  if(VISIT && tab === "shop"){ banner("🛒 Shopping is off while visiting — this nest isn't yours to grow."); tab = "pet"; }
   TAB = tab;
   ["pet","nest","shop","log"].forEach(x => $("panel-" + x).classList.toggle("hidden", x !== tab));
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
@@ -729,7 +730,7 @@ $("btnTestXp").onclick = () => {
   if(stageOf(pet.xp) > before) currentLine = "evolved";
   renderPet();
 };
-$("btnReset").onclick = () => { if(confirm("Start over? This releases every pet in your nest.")){ localStorage.removeItem(KEY); S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); } };
+$("btnReset").onclick = () => { if(VISIT){ exitVisit(); return; } if(confirm("Start over? This releases every pet in your nest.")){ localStorage.removeItem(KEY); S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); } };
 
 /* ================= BOOT ================= */
 ensure();
@@ -751,20 +752,32 @@ setInterval(() => {
 const SB_URL = "https://jhzzrynvuyxdfimbtztc.supabase.co";
 const SB_KEY = "sb_publishable_pysxEIVvGeE9X2axPGj8gQ_Gads9LEh";
 let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null, sbLogSig = null;
+let VISIT = null; // { ownerId, homeS, logSnapshot:Set } while caring for a shared nest
 try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; }
 const _saveLocal = save;
-save = function(){ _saveLocal(); sbDirty = true; clearTimeout(sbTimer); sbTimer = setTimeout(sbPush, 900); };
+save = function(){
+  if(VISIT){ try{ localStorage.setItem("clickpet-visit", JSON.stringify(S)); }catch(e){} }
+  else _saveLocal();
+  sbDirty = true; clearTimeout(sbTimer); sbTimer = setTimeout(sbPush, 900);
+};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function petToRow(p){ return { id:p.id, owner:SB_USER.id, species_id:p.speciesId, custom_desc:p.customDesc || null, seasonal_key:p.seasonalKey || null, name:p.name || "", xp:p.xp, health:p.health, happy:p.happy, dormant:p.dormant, day_counts:p.day.counts || {}, day_wish:p.day.wish || null, day_wish_done:!!p.day.wishDone, day_bonus_paid:!!p.day.bonusPaid, day_date:p.day.date, hatched_at:p.hatchedAt || new Date().toISOString(), last_care_date:p.lastCare || null, has_bred:!!p.hasBred }; }
+function petToRow(p){ return { id:p.id, owner: VISIT ? VISIT.ownerId : SB_USER.id, species_id:p.speciesId, custom_desc:p.customDesc || null, seasonal_key:p.seasonalKey || null, name:p.name || "", xp:p.xp, health:p.health, happy:p.happy, dormant:p.dormant, day_counts:p.day.counts || {}, day_wish:p.day.wish || null, day_wish_done:!!p.day.wishDone, day_bonus_paid:!!p.day.bonusPaid, day_date:p.day.date, hatched_at:p.hatchedAt || new Date().toISOString(), last_care_date:p.lastCare || null, has_bred:!!p.hasBred }; }
 function rowToPet(r){ return { id:r.id, speciesId:r.species_id, customDesc:r.custom_desc || undefined, seasonalKey:r.seasonal_key || undefined, name:r.name, xp:r.xp, health:Number(r.health), happy:Number(r.happy), dormant:r.dormant, day:{ date:r.day_date, counts:r.day_counts || {}, wish:r.day_wish || undefined, wishDone:r.day_wish_done, bonusPaid:r.day_bonus_paid }, hatchedAt:r.hatched_at, lastCare:r.last_care_date || undefined, hasBred:r.has_bred }; }
 async function sbPush(){
   if(!sb || !SB_USER || !S || !sbDirty) return; sbDirty = false;
   try{
     for(const p of S.pets){ if(!UUID_RE.test(p.id)){ const nid = crypto.randomUUID(); if(S.activeId === p.id) S.activeId = nid; if(S.pendingNameId === p.id) S.pendingNameId = nid; p.id = nid; _saveLocal(); } }
-    await sb.from("profiles").upsert({ id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null });
+    if(!VISIT) await sb.from("profiles").upsert({ id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null });
     if(S.pets.length) await sb.from("pets").upsert(S.pets.map(petToRow));
+    if(VISIT){
+      const fresh = (S.log || []).filter(e => !VISIT.logSnapshot.has(e));
+      if(fresh.length){
+        await sb.from("care_log").insert(fresh.slice().reverse().map(e => ({ owner:VISIT.ownerId, entry:e })));
+        fresh.forEach(e => VISIT.logSnapshot.add(e));
+      }
+    }
     const logSig = (S.log || []).join("\n");
-    if(logSig !== sbLogSig){
+    if(!VISIT && logSig !== sbLogSig){
       await sb.from("care_log").delete().eq("owner", SB_USER.id);
       const rows = (S.log || []).slice(0, 40).slice().reverse().map(e => ({ owner:SB_USER.id, entry:e }));
       if(rows.length) await sb.from("care_log").insert(rows);
@@ -774,7 +787,7 @@ async function sbPush(){
   }catch(e){ sbDirty = true; }
 }
 async function sbPullOrMigrate(){
-  if(!sb || !SB_USER || sbPulledFor === SB_USER.id) return; sbPulledFor = SB_USER.id;
+  if(!sb || !SB_USER || VISIT || sbPulledFor === SB_USER.id) return; sbPulledFor = SB_USER.id;
   try{
     const { data:rows } = await sb.from("pets").select("*").eq("owner", SB_USER.id).order("hatched_at");
     if(rows && rows.length){
@@ -802,6 +815,7 @@ function renderAccount(){
     box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button><div id="ccBox" style="margin-top:14px"></div>`;
     $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; renderAccount(); };
     fillCaretakers();
+    if(VISIT){ box.insertAdjacentHTML("afterbegin", `<button class="small" id="btnExitVisit" style="margin-bottom:12px">← Return to my nest</button>`); $("btnExitVisit").onclick = exitVisit; }
   } else {
     box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
     $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
@@ -831,9 +845,27 @@ async function fillCaretakers(){
   const { data:theirs } = await sb.from("co_caretakers").select("*").eq("caretaker", SB_USER.id);
   let html = "";
   (mine || []).forEach(r => { html += `<p class="sub" style="margin:4px 0">🤝 <code style="font-size:11px">${r.caretaker.slice(0, 8)}…</code> cares for your nest <button class="ghost small" data-rm="${r.caretaker}" style="width:auto; padding:2px 8px; margin-left:6px">Remove</button></p>`; });
-  if(theirs && theirs.length) html += `<p class="sub" style="margin:6px 0 0">🏠 You co-care for ${theirs.length} other nest${theirs.length === 1 ? "" : "s"} — the visiting view lands in the next slice.</p>`;
+  if(theirs && theirs.length) html += theirs.map(r => `<p class="sub" style="margin:4px 0">🏠 <code style="font-size:11px">${r.nest_owner.slice(0, 8)}…</code>'s nest <button class="ghost small" data-visit="${r.nest_owner}" style="width:auto; padding:2px 8px; margin-left:6px">Visit</button></p>`).join("");
   $("ccList").innerHTML = html;
+  box.querySelectorAll("[data-visit]").forEach(b => b.onclick = () => enterVisit(b.dataset.visit));
   box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await sb.from("co_caretakers").delete().eq("nest_owner", SB_USER.id).eq("caretaker", b.dataset.rm); fillCaretakers(); });
+}
+async function enterVisit(ownerId){
+  if(!sb || !SB_USER || VISIT) return;
+  const { data:rows } = await sb.from("pets").select("*").eq("owner", ownerId).order("hatched_at");
+  if(!rows || !rows.length){ banner("That nest has no pets yet."); return; }
+  const { data:logRows } = await sb.from("care_log").select("entry,created_at").eq("owner", ownerId).order("created_at", { ascending:false }).limit(40);
+  const entries = (logRows || []).map(r => r.entry);
+  VISIT = { ownerId, homeS: S, logSnapshot: new Set(entries) };
+  S = { pets: rows.map(rowToPet), activeId: rows[0].id, pendingNameId: null, log: entries.slice(), streak: 0, careDays: 0, lastCareDate: null, trinkets: 0 };
+  rolloverAll(); renderPet(); switchTab("pet"); renderAccount();
+  banner("🏠 You're visiting a shared nest — care you give counts for them.");
+}
+function exitVisit(){
+  if(!VISIT) return;
+  S = VISIT.homeS; VISIT = null;
+  _saveLocal(); renderPet(); renderAccount();
+  banner("🏠 Back in your own nest.");
 }
 async function sbInit(){
   renderAccount(); if(!sb) return;

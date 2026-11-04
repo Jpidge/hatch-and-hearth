@@ -52,7 +52,7 @@
   button.ghost{background:transparent; color:var(--accent); border:1px solid var(--accent-strong); font-weight:normal}
   button.small{padding:8px 10px; font-size:13px}
   .eggcard{text-align:center}
-  .egg{font-size:74px; line-height:1.1; display:inline-block; animation:bob 3s ease-in-out infinite}
+  .egg{font-size:74px; line-height:1.1; display:inline-block}
   .odds{font-size:12px; color:var(--dim)}
   /* nest strip */
   .neststrip{display:flex; gap:10px; overflow-x:auto; padding:2px 2px 6px; scrollbar-width:thin}
@@ -68,8 +68,6 @@
   .stage-wrap{position:relative; border-radius:16px; overflow:hidden; margin-top:16px}
   .stage-wrap img{width:100%; display:block}
   .stage-wrap .big-glyph{width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:120px; background:radial-gradient(80% 80% at 50% 30%, var(--surface), var(--surface-alt))}
-  .bob{animation:bob 3.4s ease-in-out infinite; will-change:transform}
-  @keyframes bob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10px) scale(1.015)}}
   .bubble{background:var(--surface-alt); color:var(--text); border-radius:14px; padding:10px 12px; font-size:15px; margin:12px 0 0; position:relative}
   .bubble:before{content:""; position:absolute; top:-8px; left:34px; border:9px solid transparent; border-bottom-color:var(--surface-alt); border-top:0}
   .bubble .glyphs{color:var(--accent-strong); letter-spacing:2px; font-size:12px; display:block; margin-bottom:2px}
@@ -183,7 +181,7 @@
         <h2 id="petTitle">—</h2>
         <span class="stage-name" id="petStage">—</span>
       </div>
-      <div class="stage-wrap bob">
+      <div class="stage-wrap">
         <img id="petImg" alt="Your pet">
         <div class="big-glyph hidden" id="petGlyph"></div>
         <div class="hearts" id="hearts"></div>
@@ -627,8 +625,6 @@ function renderPet(){
   const hp = Math.round(pet.health), xp2 = Math.round(pet.happy);
   $("healthFill").style.width = hp + "%"; $("healthNum").textContent = hp + "%";
   $("happyFill").style.width = xp2 + "%"; $("happyNum").textContent = xp2 + "%";
-  const low = Math.min(pet.health, pet.happy);
-  document.querySelector(".stage-wrap").style.animationDuration = (low > 60 ? 3.4 : low >= 25 ? 5.4 : 8.5) + "s"; // the fade is visible: lower bars, slower bob
   $("wakeCard").classList.toggle("hidden", !pet.dormant);
   $("careCard").classList.toggle("hidden", pet.dormant);
   const wish = NEEDS.find(n => n.id === pet.day.wish);

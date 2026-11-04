@@ -831,11 +831,11 @@ function renderAccount(){
   if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p>"; return; }
   if(SB_USER){
     box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button><div id="ccBox" style="margin-top:14px"></div>`;
-    $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; renderAccount(); };
+    $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; sbLogSig = null; sbPushSig = null; if(VISIT) exitVisit(); renderAccount(); banner("Signed out — your nest stays on this device; it just won't sync."); };
     fillCaretakers();
     if(VISIT){ box.insertAdjacentHTML("afterbegin", `<button class="small" id="btnExitVisit" style="margin-bottom:12px">← Return to my nest</button>`); $("btnExitVisit").onclick = exitVisit; }
   } else {
-    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link. Your nest stays on this device either way — it just won't sync.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
     $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? sbErrText(error) : "📬 Link sent — open it on this device and you're in."; };
   }
 }

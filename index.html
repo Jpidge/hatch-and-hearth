@@ -816,7 +816,7 @@ function renderAccount(){
     if(VISIT){ box.insertAdjacentHTML("afterbegin", `<button class="small" id="btnExitVisit" style="margin-bottom:12px">← Return to my nest</button>`); $("btnExitVisit").onclick = exitVisit; }
   } else {
     box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
-    $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
+    $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? sbErrText(error) : "📬 Link sent — open it on this device and you're in."; };
   }
 }
 async function fillCaretakers(){
@@ -848,6 +848,11 @@ async function fillCaretakers(){
   box.querySelectorAll("[data-visit]").forEach(b => b.onclick = () => enterVisit(b.dataset.visit));
   box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await sb.from("co_caretakers").delete().eq("nest_owner", SB_USER.id).eq("caretaker", b.dataset.rm); fillCaretakers(); });
 }
+function sbErrText(error){
+  const m = (error && error.message) || "unknown error";
+  if(/rate/i.test(m)) return "Too many links lately — the free mailer only sends a few an hour. Give it a while, then try once.";
+  return "That didn't send: " + m;
+}
 function renderAccountBar(){
   const bar = $("accountBar"); if(!bar) return;
   if(!sb){ bar.classList.add("hidden"); return; }
@@ -856,7 +861,7 @@ function renderAccountBar(){
     bar.innerHTML = `<p class="sub" style="margin:0">☁️ Signed in as <b>${SB_USER.email}</b> — your nest syncs to this device.</p>`;
   } else {
     bar.innerHTML = `<h3 style="margin:0 0 4px; font-size:15px">Have a nest already?</h3><p class="sub" style="margin:0 0 10px">Sign in and it follows you here. No password — we email you a link.</p><input type="email" id="sbEmailBar" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignInBar">Email me a sign-in link</button><p class="sub" id="sbMsgBar" style="margin:8px 0 0"></p>`;
-    $("btnSignInBar").onclick = async () => { const em = $("sbEmailBar").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsgBar").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
+    $("btnSignInBar").onclick = async () => { const em = $("sbEmailBar").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsgBar").textContent = error ? sbErrText(error) : "📬 Link sent — open it on this device and you're in."; };
   }
 }
 async function enterVisit(ownerId){

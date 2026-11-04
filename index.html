@@ -182,6 +182,16 @@
         <h2 id="petTitle">—</h2>
         <span class="stage-name" id="petStage">—</span>
       </div>
+      <div id="renameRow">
+        <button class="ghost small" id="btnRename" style="width:auto">✎ Rename</button>
+        <div id="renameEdit" class="hidden" style="margin-top:8px">
+          <input type="text" id="renameInput" maxlength="24" placeholder="New name">
+          <div style="display:flex; gap:8px; margin-top:8px">
+            <button class="small" id="btnRenameSave">Save name</button>
+            <button class="ghost small" id="btnRenameCancel">Cancel</button>
+          </div>
+        </div>
+      </div>
       <div class="stage-wrap">
         <img id="petImg" alt="Your pet">
         <div class="big-glyph hidden" id="petGlyph"></div>
@@ -613,6 +623,8 @@ function renderPet(){
   renderNest();
   $("petTitle").textContent = pet.name || sp.name;
   $("petStage").textContent = sp.name + " · " + STAGES[st] + (pet.dormant ? " · dormant" : "");
+  $("renameRow").classList.toggle("hidden", !!VISIT);
+  if(VISIT || (renameForId && renameForId !== pet.id)) closeRename();
   const img = $("petImg"), gl = $("petGlyph");
   const art = artFor(sp, pet);
   if(art){ img.src = art; img.classList.remove("hidden"); gl.classList.add("hidden"); }
@@ -699,6 +711,33 @@ $("btnName").onclick = () => {
   save(); renderPet();
 };
 $("petName").addEventListener("keydown", e => { if(e.key === "Enter") $("btnName").click(); });
+let renameForId = null;
+function closeRename(){
+  renameForId = null;
+  const ed = $("renameEdit"), btn = $("btnRename");
+  if(ed) ed.classList.add("hidden");
+  if(btn) btn.classList.remove("hidden");
+}
+$("btnRename").onclick = () => {
+  const pet = activePet(); if(!pet || VISIT) return;
+  renameForId = pet.id;
+  $("renameInput").value = pet.name || "";
+  $("renameEdit").classList.remove("hidden");
+  $("btnRename").classList.add("hidden");
+  $("renameInput").focus();
+};
+$("btnRenameCancel").onclick = closeRename;
+$("renameInput").addEventListener("keydown", e => { if(e.key === "Enter") $("btnRenameSave").click(); });
+$("btnRenameSave").onclick = () => {
+  const pet = activePet(); if(!pet || pet.id !== renameForId) return closeRename();
+  const v = $("renameInput").value.trim().slice(0, 24);
+  if(v && v !== pet.name){
+    S.log.unshift("✏️ " + (pet.name || "Your pet") + " is now called " + v + ".");
+    pet.name = v;
+    save(); closeRename(); renderPet();
+    banner("✏️ Renamed — say hello to " + v + ".");
+  } else closeRename();
+};
 $("btnNameBack").onclick = () => {
   const pet = pendingPet();
   if(pet && !pet.name){

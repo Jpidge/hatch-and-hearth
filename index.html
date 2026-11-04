@@ -799,12 +799,41 @@ function renderAccount(){
   const box = $("accountBox"); if(!box) return;
   if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p>"; return; }
   if(SB_USER){
-    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button>`;
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button><div id="ccBox" style="margin-top:14px"></div>`;
     $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; renderAccount(); };
+    fillCaretakers();
   } else {
     box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
     $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
   }
+}
+async function fillCaretakers(){
+  const box = $("ccBox"); if(!box || !sb || !SB_USER) return;
+  box.innerHTML = `<h4 style="margin:0 0 6px; font-size:14px">Co-caretakers</h4>
+    <p class="sub" style="margin:0 0 6px">Your friend code — share it with someone you trust:</p>
+    <p style="margin:0 0 8px"><code id="ccMine" style="font-size:11px; word-break:break-all">${SB_USER.id}</code></p>
+    <button class="ghost small" id="ccCopy" style="margin-bottom:12px">Copy my code</button>
+    <p class="sub" style="margin:0 0 6px">Got someone's code? Make them a co-caretaker of your nest:</p>
+    <input type="text" id="ccCode" placeholder="Paste their friend code" style="margin-bottom:8px">
+    <button class="small" id="ccAdd">Add co-caretaker</button>
+    <p class="sub" id="ccMsg" style="margin:8px 0 0"></p>
+    <div id="ccList" style="margin-top:8px"></div>`;
+  $("ccCopy").onclick = () => { if(navigator.clipboard) navigator.clipboard.writeText(SB_USER.id); $("ccCopy").textContent = "Copied ✓"; };
+  $("ccAdd").onclick = async () => {
+    const code = $("ccCode").value.trim();
+    if(!UUID_RE.test(code)){ $("ccMsg").textContent = "That doesn't look like a friend code."; return; }
+    if(code === SB_USER.id){ $("ccMsg").textContent = "That's your own code, love."; return; }
+    const { error } = await sb.from("co_caretakers").insert({ nest_owner:SB_USER.id, caretaker:code });
+    $("ccMsg").textContent = error ? "That didn't take — they may already be a co-caretaker." : "✓ Added — your nest is shared with them now.";
+    if(!error) fillCaretakers();
+  };
+  const { data:mine } = await sb.from("co_caretakers").select("*").eq("nest_owner", SB_USER.id);
+  const { data:theirs } = await sb.from("co_caretakers").select("*").eq("caretaker", SB_USER.id);
+  let html = "";
+  (mine || []).forEach(r => { html += `<p class="sub" style="margin:4px 0">🤝 <code style="font-size:11px">${r.caretaker.slice(0, 8)}…</code> cares for your nest <button class="ghost small" data-rm="${r.caretaker}" style="width:auto; padding:2px 8px; margin-left:6px">Remove</button></p>`; });
+  if(theirs && theirs.length) html += `<p class="sub" style="margin:6px 0 0">🏠 You co-care for ${theirs.length} other nest${theirs.length === 1 ? "" : "s"} — the visiting view lands in the next slice.</p>`;
+  $("ccList").innerHTML = html;
+  box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await sb.from("co_caretakers").delete().eq("nest_owner", SB_USER.id).eq("caretaker", b.dataset.rm); fillCaretakers(); });
 }
 async function sbInit(){
   renderAccount(); if(!sb) return;

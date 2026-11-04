@@ -296,7 +296,6 @@
   </div>
 </div>
 
-<script src="./supabase.min.js"></script>
 <script>
 "use strict";
 /* ================= DATA ================= */
@@ -791,12 +790,20 @@ $("btnTestXp").onclick = () => {
 };
 $("btnReset").onclick = () => { if(VISIT){ exitVisit(); return; } if(confirm("Start over? This releases every pet in your nest.")){ localStorage.removeItem(KEY); S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); } };
 
+let VISIT = null; // { ownerId, homeS, logSnapshot:Set } while caring for a shared nest — MUST stay above BOOT: renderPet() reads it during boot
 /* ================= BOOT ================= */
-ensure();
-rolloverAll();
-if(S && pendingPet()) renderName();
-else if(S && S.pets.length) renderPet();
-else { S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); }
+try{
+  ensure();
+  rolloverAll();
+  if(S && pendingPet()) renderName();
+  else if(S && S.pets.length) renderPet();
+  else { S = null; shelfMode = "first"; renderShelf(); show("view-shelf"); }
+}catch(err){
+  try{ shelfMode = "first"; renderShelf(); show("view-shelf"); }catch(e){}
+  const b = $("banner");
+  b.textContent = "The nest hiccuped while starting: " + (err && err.message ? err.message : err) + " — screenshot this for Rowan.";
+  b.classList.remove("hidden");
+}
 if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
@@ -811,7 +818,9 @@ setInterval(() => {
 const SB_URL = "https://jhzzrynvuyxdfimbtztc.supabase.co";
 const SB_KEY = "sb_publishable_pysxEIVvGeE9X2axPGj8gQ_Gads9LEh";
 let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null, sbLogSig = null, sbPushSig = null;
-let VISIT = null; // { ownerId, homeS, logSnapshot:Set } while caring for a shared nest
+/* VISIT itself is declared just above the BOOT block, not here: renderPet() reads it
+   during boot, and a `let` declared after the boot code is a TDZ crash — that exact
+   bug shipped in the rename build and broke the app for every returning user. */
 try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; }
 const _saveLocal = save;
 save = function(){
@@ -992,7 +1001,19 @@ async function sbInit(){
   sb.auth.onAuthStateChange((_ev, session) => { SB_USER = session ? session.user : null; renderAccount(); if(SB_USER) sbPullOrMigrate(); });
 }
 if(sessionStorage.getItem("hh-deleted")){ sessionStorage.removeItem("hh-deleted"); banner("Your account has been deleted — pets, log and all. This device starts fresh."); }
-sbInit();
+/* The library script now loads AFTER this one, so the game never waits on it:
+   start once now (in case it is somehow ready) and again when the window finishes loading. */
+let sbStarted = false;
+function startSb(){
+  if(sbStarted) return;
+  if(!sb){ try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; } }
+  if(!sb){ renderAccount(); return; }
+  sbStarted = true;
+  sbInit();
+}
+startSb();
+window.addEventListener("load", startSb);
 </script>
+<script src="./supabase.min.js"></script>
 </body>
 </html>

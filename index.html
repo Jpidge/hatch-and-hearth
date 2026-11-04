@@ -762,7 +762,7 @@ setInterval(() => {
 /* ================= SUPABASE SYNC (Phase 3, slice 1: auth + nest) ================= */
 const SB_URL = "https://jhzzrynvuyxdfimbtztc.supabase.co";
 const SB_KEY = "sb_publishable_pysxEIVvGeE9X2axPGj8gQ_Gads9LEh";
-let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null, sbLogSig = null;
+let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null, sbLogSig = null, sbPushSig = null;
 let VISIT = null; // { ownerId, homeS, logSnapshot:Set } while caring for a shared nest
 try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; }
 const _saveLocal = save;
@@ -778,8 +778,14 @@ async function sbPush(){
   if(!sb || !SB_USER || !S || !sbDirty) return; sbDirty = false;
   try{
     for(const p of S.pets){ if(!UUID_RE.test(p.id)){ const nid = crypto.randomUUID(); if(S.activeId === p.id) S.activeId = nid; if(S.pendingNameId === p.id) S.pendingNameId = nid; p.id = nid; _saveLocal(); } }
-    if(!VISIT) await sb.from("profiles").upsert({ id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null });
-    if(S.pets.length) await sb.from("pets").upsert(S.pets.map(petToRow));
+    const profRow = VISIT ? null : { id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null };
+    const petRows = S.pets.map(petToRow);
+    const payloadSig = (VISIT ? VISIT.ownerId : SB_USER.id) + "|" + JSON.stringify([profRow, petRows]);
+    if(payloadSig !== sbPushSig){
+      if(profRow) await sb.from("profiles").upsert(profRow);
+      if(petRows.length) await sb.from("pets").upsert(petRows);
+      sbPushSig = payloadSig;
+    }
     if(VISIT){
       const fresh = (S.log || []).filter(e => !VISIT.logSnapshot.has(e));
       if(fresh.length){

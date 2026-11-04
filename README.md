@@ -16,8 +16,8 @@ No pet limits. No subscriptions. No trading. Everything is a durable good, sold 
 
 - **First pet** — free
 - **Each additional pet** — $1, forever yours
-- **Custom Hatch** — $10, a companion designed from your words
-- **Seasonal pets** — $10, four a year, each on sale for about two weeks
+- **Custom Hatch** — $10 each, a companion designed from your words
+- **Seasonal pets** — $10 each, released throughout the year, each on sale for a limited time
 
 ## Status
 

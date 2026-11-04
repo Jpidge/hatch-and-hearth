@@ -750,7 +750,7 @@ setInterval(() => {
 /* ================= SUPABASE SYNC (Phase 3, slice 1: auth + nest) ================= */
 const SB_URL = "https://jhzzrynvuyxdfimbtztc.supabase.co";
 const SB_KEY = "sb_publishable_pysxEIVvGeE9X2axPGj8gQ_Gads9LEh";
-let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null;
+let sb = null, SB_USER = null, sbDirty = false, sbTimer = null, sbPulledFor = null, sbLogSig = null;
 try{ if(window.supabase) sb = window.supabase.createClient(SB_URL, SB_KEY); }catch(e){ sb = null; }
 const _saveLocal = save;
 save = function(){ _saveLocal(); sbDirty = true; clearTimeout(sbTimer); sbTimer = setTimeout(sbPush, 900); };
@@ -763,6 +763,13 @@ async function sbPush(){
     for(const p of S.pets){ if(!UUID_RE.test(p.id)){ const nid = crypto.randomUUID(); if(S.activeId === p.id) S.activeId = nid; if(S.pendingNameId === p.id) S.pendingNameId = nid; p.id = nid; _saveLocal(); } }
     await sb.from("profiles").upsert({ id:SB_USER.id, trinkets:S.trinkets || 0, streak:S.streak || 0, care_days:S.careDays || 0, last_full_care_date:S.lastCareDate || null });
     if(S.pets.length) await sb.from("pets").upsert(S.pets.map(petToRow));
+    const logSig = (S.log || []).join("\n");
+    if(logSig !== sbLogSig){
+      await sb.from("care_log").delete().eq("owner", SB_USER.id);
+      const rows = (S.log || []).slice(0, 40).slice().reverse().map(e => ({ owner:SB_USER.id, entry:e }));
+      if(rows.length) await sb.from("care_log").insert(rows);
+      sbLogSig = logSig;
+    }
     const st = $("sbStatus"); if(st) st.textContent = "✓ Synced just now";
   }catch(e){ sbDirty = true; }
 }
@@ -777,6 +784,8 @@ async function sbPullOrMigrate(){
       if(!S.pets.some(p => p.id === keepActive)) S.activeId = S.pets[0].id;
       const { data:prof } = await sb.from("profiles").select("*").eq("id", SB_USER.id).maybeSingle();
       if(prof){ S.trinkets = prof.trinkets || 0; S.streak = prof.streak || 0; S.careDays = prof.care_days || 0; S.lastCareDate = prof.last_full_care_date || null; }
+      const { data:logRows } = await sb.from("care_log").select("entry,created_at").eq("owner", SB_USER.id).order("created_at", { ascending:false }).limit(40);
+      if(logRows) { S.log = logRows.map(r => r.entry); sbLogSig = S.log.join("\n"); }
       _saveLocal(); rolloverAll();
       if(S.pendingNameId && S.pets.some(p => p.id === S.pendingNameId)) renderName(); else renderPet();
     } else if(S && S.pets.length && !localStorage.getItem("hh-migrated-" + SB_USER.id)){

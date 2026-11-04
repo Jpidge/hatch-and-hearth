@@ -101,12 +101,30 @@
   .mbox{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; max-width:440px; width:100%; box-shadow:0 12px 32px rgba(0,0,0,.5)}
   .mbox h3{margin:0 0 8px}
   .mbox .mtext{font-size:14px; color:var(--dim); margin:0 0 12px}
+
+  /* tab bar + nest grid (Tabs UI, John's pick 2026-11-04) */
+  .wrap{padding-bottom:96px}
+  .tabbar{position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:100%; max-width:520px; display:flex; gap:4px; background:rgba(46,33,51,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line); z-index:40; padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+  .tabbar button{flex:1; width:auto; background:transparent; color:var(--dim); font-size:11px; font-weight:normal; padding:6px 0 4px; border-radius:10px}
+  .tabbar button .ti{display:block; font-size:19px; line-height:1.15}
+  .tabbar button.on{color:var(--amber); background:rgba(240,179,94,.13)}
+  .nestgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .npet{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:10px; text-align:center; cursor:pointer}
+  .npet.active{border-color:var(--amber)}
+  .npet.dormant{opacity:.75}
+  .npet img{width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; display:block}
+  .npet .cglyph{width:100%; aspect-ratio:1; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:44px; background:#2a1e30}
+  .npet h4{margin:8px 0 2px; font-size:14px}
+  .minibar{height:6px; background:#241a26; border-radius:99px; overflow:hidden; margin:4px 0 2px}
+  .minibar i{display:block; height:100%; background:var(--amber)}
+  .minibar i.low{background:#e06c5e}
+  .minilabel{font-size:10px; color:var(--dim); text-align:left}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🔥 Hatch &amp; Hearth</h1>
-  <p class="sub">Phase 2 test build — the nest update: many pets, dormancy, the two-price shop (billing stubbed)</p>
+  <p class="sub">Phase 2 test build — tabbed UI: Pet · Nest · Shop · Log (billing stubbed)</p>
 
   <div id="banner" class="banner hidden"></div>
 
@@ -143,6 +161,7 @@
       <div class="neststrip" id="nestStrip"></div>
     </div>
 
+    <div id="panel-pet">
     <div class="card">
       <div class="pethead">
         <h2 id="petTitle">—</h2>
@@ -177,6 +196,18 @@
       <p class="note">Care that meets a need earns +10 XP. A full day of care earns +50 more. Max 160 XP a day per pet — no grinding, just showing up.</p>
     </div>
 
+    </div>
+
+    <div id="panel-nest" class="hidden">
+    <div class="card">
+      <h3 style="margin:0 0 4px; font-size:15px">The nest</h3>
+      <p class="sub" id="nestSummary" style="margin:0 0 10px">—</p>
+      <div class="nestgrid" id="nestGrid"></div>
+      <p class="note">Tap a pet to spend time with it. A pet you don't reach today simply sleeps a little — nothing is ever lost.</p>
+    </div>
+    </div>
+
+    <div id="panel-shop" class="hidden">
     <div class="card">
       <h3 style="margin:0 0 10px; font-size:15px">Grow the nest</h3>
       <div class="offer">
@@ -197,8 +228,11 @@
       <p class="note">Test build: purchases are pretend — Play Billing arrives with the store phase. The prices are the real ones.</p>
     </div>
 
+    </div>
+
+    <div id="panel-log" class="hidden">
     <div class="card">
-      <h3 style="margin:0 0 8px; font-size:15px">The nest</h3>
+      <h3 style="margin:0 0 8px; font-size:15px">Nest log</h3>
       <p class="sub" id="nestStats" style="margin:0 0 10px">—</p>
       <ul class="log" id="careLog"></ul>
       <div class="row" style="margin-top:12px">
@@ -207,8 +241,17 @@
       </div>
       <p class="note">Phase 2 keeps your nest on this device only. Accounts arrive with the backend phase.</p>
     </div>
+    </div>
   </section>
 </div>
+
+<!-- ============ TAB BAR ============ -->
+<nav id="tabbar" class="tabbar hidden">
+  <button data-tab="pet" class="on"><span class="ti">🐾</span>Pet</button>
+  <button data-tab="nest"><span class="ti">🪺</span>Nest</button>
+  <button data-tab="shop"><span class="ti">🥚</span>Shop</button>
+  <button data-tab="log"><span class="ti">📜</span>Log</button>
+</nav>
 
 <!-- ============ MODAL ============ -->
 <div id="modal" class="modal hidden">
@@ -388,6 +431,7 @@ function rolloverAll(){
 const $ = id => document.getElementById(id);
 function show(view){
   ["view-shelf","view-name","view-pet"].forEach(v => $(v).classList.toggle("hidden", v !== view));
+  $("tabbar").classList.toggle("hidden", view !== "view-pet");
 }
 function banner(msg){ const b = $("banner"); b.textContent = msg; b.classList.remove("hidden"); setTimeout(()=>b.classList.add("hidden"), 6000); }
 
@@ -483,8 +527,49 @@ function renderNest(){
   });
   const add = document.createElement("div");
   add.className = "chip add"; add.innerHTML = "＋<span class='cs'>new pet</span>";
-  add.onclick = () => $("btnAddPet").click();
+  add.onclick = () => switchTab("shop");
   el.appendChild(add);
+}
+
+/* ================= TABS + NEST GRID ================= */
+let TAB = "pet";
+function switchTab(tab){
+  TAB = tab;
+  ["pet","nest","shop","log"].forEach(x => $("panel-" + x).classList.toggle("hidden", x !== tab));
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  if(tab === "nest") renderNestGrid();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("#tabbar button").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+function renderNestGrid(){
+  const grid = $("nestGrid"); if(!grid) return;
+  grid.innerHTML = "";
+  const tended = S.pets.filter(p => !p.dormant && allMet(p)).length;
+  $("nestSummary").textContent = S.pets.length + (S.pets.length === 1 ? " pet" : " pets") + " · " + tended + " fully tended today";
+  S.pets.forEach(p => {
+    const sp = speciesOf(p), st = stageOf(p.xp);
+    const card = document.createElement("div");
+    card.className = "npet" + (p.id === S.activeId ? " active" : "") + (p.dormant ? " dormant" : "");
+    const status = p.dormant ? "💤 dormant" : allMet(p) ? "✓ cared for" : "needs care";
+    card.innerHTML = `${sp.art ? `<img src="${artFor(sp, p)}" alt="">` : `<div class="cglyph">${sp.glyph}</div>`}
+      <h4>${p.name || sp.name}</h4>
+      <span class="tag">${STAGES[st]} · ${status}</span>
+      <div class="minilabel" style="margin-top:8px">Health</div><div class="minibar"><i style="width:${Math.round(p.health)}%" class="${p.health < 30 ? "low" : ""}"></i></div>
+      <div class="minilabel">Happiness</div><div class="minibar"><i style="width:${Math.round(p.happy)}%" class="${p.happy < 30 ? "low" : ""}"></i></div>
+      ${p.dormant ? '<button class="small" style="margin-top:8px">Wake — free, instant</button>' : ''}`;
+    card.onclick = () => {
+      const wasDormant = p.dormant;
+      if(wasDormant){ p.dormant = false; p.health = 10; p.happy = 10; }
+      S.activeId = p.id; save(); renderPet(); switchTab("pet");
+      if(wasDormant) say("wake");
+    };
+    grid.appendChild(card);
+  });
+  const add = document.createElement("div");
+  add.className = "npet";
+  add.innerHTML = '<div class="cglyph">＋</div><h4>Add a pet</h4><span class="tag">$1 · or $10 Custom</span>';
+  add.onclick = () => switchTab("shop");
+  grid.appendChild(add);
 }
 
 /* ================= PET VIEW ================= */

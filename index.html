@@ -829,14 +829,14 @@ async function sbPullOrMigrate(){
 function renderAccount(){
   renderAccountBar();
   const box = $("accountBox"); if(!box) return;
-  if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p>"; return; }
+  if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p><p class='sub' style='margin:10px 0 0'><a href='privacy.html' target='_blank' rel='noopener'>Privacy policy</a></p>"; return; }
   if(SB_USER){
-    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button><div id="ccBox" style="margin-top:14px"></div>`;
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 4px">Signed in as <b>${SB_USER.email}</b></p><p class="sub" id="sbStatus" style="margin:0 0 10px">✓ Nest synced to your account</p><button class="ghost small" id="btnSignOut">Sign out</button><div id="ccBox" style="margin-top:14px"></div><div id="dangerBox" style="margin-top:16px"></div><p class="sub" style="margin:14px 0 0"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>`;
     $("btnSignOut").onclick = async () => { await sb.auth.signOut(); SB_USER = null; sbPulledFor = null; sbLogSig = null; sbPushSig = null; if(VISIT) exitVisit(); renderAccount(); banner("Signed out — your nest stays on this device; it just won't sync."); };
-    fillCaretakers();
+    fillCaretakers(); fillDanger();
     if(VISIT){ box.insertAdjacentHTML("afterbegin", `<button class="small" id="btnExitVisit" style="margin-bottom:12px">← Return to my nest</button>`); $("btnExitVisit").onclick = exitVisit; }
   } else {
-    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link. Your nest stays on this device either way — it just won't sync.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p>`;
+    box.innerHTML = `<h3 style="margin:0 0 6px; font-size:15px">Account</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a sign-in link. Your nest stays on this device either way — it just won't sync.</p><input type="email" id="sbEmail" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignIn">Email me a sign-in link</button><p class="sub" id="sbMsg" style="margin:8px 0 0"></p><p class="sub" style="margin:12px 0 0"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>`;
     $("btnSignIn").onclick = async () => { const em = $("sbEmail").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsg").textContent = error ? sbErrText(error) : "📬 Link sent — open it on this device and you're in."; };
   }
 }
@@ -868,6 +868,42 @@ async function fillCaretakers(){
   $("ccList").innerHTML = html;
   box.querySelectorAll("[data-visit]").forEach(b => b.onclick = () => enterVisit(b.dataset.visit));
   box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await sb.from("co_caretakers").delete().eq("nest_owner", SB_USER.id).eq("caretaker", b.dataset.rm); fillCaretakers(); });
+}
+function fillDanger(){
+  const box = $("dangerBox"); if(!box) return;
+  if(!sb || !SB_USER || VISIT){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div style="border-top:1px solid var(--border); padding-top:12px">
+    <h4 style="margin:0 0 6px; font-size:14px">Delete my account</h4>
+    <p class="sub" style="margin:0 0 8px">Permanently deletes your account, every pet, your care log and purchase records — from our server and from this device. It cannot be undone.</p>
+    <div id="delStep1"><button class="ghost small" id="btnDelStart" style="color:var(--rose); border-color:var(--rose); width:auto">Delete my account…</button></div>
+    <div id="delStep2" class="hidden">
+      <label class="sub" style="display:flex; gap:8px; align-items:flex-start; margin:0 0 10px"><input type="checkbox" id="delAck" style="width:auto; margin-top:3px"> I understand my pets will be gone for good — including any I paid for.</label>
+      <button id="btnDelGo" disabled style="background:var(--rose); color:#fff">Permanently delete my account</button>
+      <button class="ghost small" id="btnDelCancel" style="margin-top:8px">Keep my account</button>
+      <p class="sub" id="delMsg" style="margin:8px 0 0"></p>
+    </div></div>`;
+  $("btnDelStart").onclick = () => { $("delStep1").classList.add("hidden"); $("delStep2").classList.remove("hidden"); };
+  $("btnDelCancel").onclick = () => { $("delStep2").classList.add("hidden"); $("delStep1").classList.remove("hidden"); $("delAck").checked = false; $("btnDelGo").disabled = true; };
+  $("delAck").onchange = () => { $("btnDelGo").disabled = !$("delAck").checked; };
+  $("btnDelGo").onclick = deleteAccount;
+}
+async function deleteAccount(){
+  const msg = $("delMsg"), btn = $("btnDelGo");
+  btn.disabled = true; msg.textContent = "Deleting…";
+  try{
+    const { error } = await sb.functions.invoke("delete-account");
+    if(error) throw error;
+  }catch(e){
+    msg.textContent = "Deletion didn't go through — email jpidge.business@gmail.com from your account email and we'll delete it for you.";
+    btn.disabled = false;
+    return;
+  }
+  try{ await sb.auth.signOut(); }catch(e){}
+  localStorage.removeItem(KEY);
+  localStorage.removeItem("clickpet-visit");
+  Object.keys(localStorage).filter(k => k.indexOf("hh-migrated-") === 0).forEach(k => localStorage.removeItem(k));
+  sessionStorage.setItem("hh-deleted", "1");
+  location.reload();
 }
 function sbErrText(error){
   const m = (error && error.message) || "unknown error";
@@ -908,6 +944,7 @@ async function sbInit(){
   if(SB_USER) sbPullOrMigrate();
   sb.auth.onAuthStateChange((_ev, session) => { SB_USER = session ? session.user : null; renderAccount(); if(SB_USER) sbPullOrMigrate(); });
 }
+if(sessionStorage.getItem("hh-deleted")){ sessionStorage.removeItem("hh-deleted"); banner("Your account has been deleted — pets, log and all. This device starts fresh."); }
 sbInit();
 </script>
 </body>

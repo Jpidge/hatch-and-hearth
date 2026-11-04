@@ -880,7 +880,7 @@ function renderAccountBar(){
   if(SB_USER){
     bar.innerHTML = `<p class="sub" style="margin:0">☁️ Signed in as <b>${SB_USER.email}</b> — your nest syncs to this device.</p>`;
   } else {
-    bar.innerHTML = `<h3 style="margin:0 0 4px; font-size:15px">Have a nest already?</h3><p class="sub" style="margin:0 0 10px">Sign in and it follows you here. No password — we email you a link.</p><input type="email" id="sbEmailBar" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignInBar">Email me a sign-in link</button><p class="sub" id="sbMsgBar" style="margin:8px 0 0"></p>`;
+    bar.innerHTML = `<h3 style="margin:0 0 4px; font-size:15px">Save your nest</h3><p class="sub" style="margin:0 0 10px">Sign in and your nest follows you to any device. No password — we email you a link.</p><input type="email" id="sbEmailBar" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignInBar">Email me a sign-in link</button><p class="sub" id="sbMsgBar" style="margin:8px 0 0"></p>`;
     $("btnSignInBar").onclick = async () => { const em = $("sbEmailBar").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsgBar").textContent = error ? sbErrText(error) : "📬 Link sent — open it on this device and you're in."; };
   }
 }

@@ -1,6 +1,6 @@
 # 🔥 Hatch & Hearth
 
-**Clockwork pet companions.** Hatch a pet, care for it a little each day, and watch it grow through four stages — Hatchling, Sproutwing, Lanternwing, Grand Clockwork — in about six weeks of showing up.
+**Enchanted pet companions** — some wound with keys, some grown from gardens, some simply magical. Hatch a pet, care for it a little each day, and watch it grow through four stages — Hatchling, Sproutwing, Lanternwing, Grand Clockwork — in about six weeks of showing up.
 
 **▶ Live test build:** https://jpidge.github.io/hatch-and-hearth/
 

@@ -199,7 +199,6 @@
       <p class="sub" id="nestStats" style="margin:0 0 10px">—</p>
       <ul class="log" id="careLog"></ul>
       <div class="row" style="margin-top:12px">
-        <button class="ghost small" id="btnSwap">Swap (Common only)</button>
         <button class="ghost small" id="btnTestXp">Test: +500 XP</button>
         <button class="ghost small" id="btnReset">Start over</button>
       </div>
@@ -226,7 +225,7 @@
 /* ================= DATA ================= */
 const STAGES = ["Hatchling","Sproutwing","Lanternwing","Grand Clockwork"];
 const THRESHOLDS = [0, 480, 1920, 6720]; // stage spans 3 / 9 / 30 perfect-care days — full maturity ≈ 6 weeks (John, 2026-11-04)
-const DORMANCY_DAYS = 14; // ~2 weeks uncared → dormant (John's final pick among 1/2/4 weeks still open)
+const DORMANCY_DAYS = 14; // 2 weeks uncared → dormant (confirmed by John 2026-11-04; a possible short post-dormancy wake window is an open question with him — until he rules, waking is always available and free)
 /* Lineup per the approved plan (12 species). Art lands hatchling-first;
    species without a portrait yet show their glyph until their art day. */
 const SPECIES = [
@@ -380,15 +379,13 @@ $("mCancel").onclick = hideModal;
 $("mOk").onclick = () => { const f = modalOk; hideModal(); if(f) f(); };
 
 /* ---- shelf / hatch ---- */
-let shelfMode = "first"; // first | add | swap
+let shelfMode = "first"; // first | add
 function renderShelf(){
   const el = $("shelf"); el.innerHTML = "";
-  $("eggCard").classList.toggle("hidden", shelfMode === "swap");
   $("btnShelfBack").classList.toggle("hidden", shelfMode === "first");
   $("shelfModeNote").textContent =
     shelfMode === "first" ? "Your first companion is free — choose a Common, or trust the egg." :
-    shelfMode === "add"   ? "Growing the nest (pretend-paid $1 in this test build) — choose a Common, or trust the egg." :
-                            "Swap: pick a different Common. Name, XP and stage carry over — only the shape changes.";
+                            "Growing the nest (pretend-paid $1 in this test build) — choose a Common, or trust the egg.";
   SPECIES.forEach(sp => {
     const d = document.createElement("div");
     d.className = "species" + (sp.rarity !== "common" ? " sil" : "");
@@ -397,7 +394,7 @@ function renderShelf(){
       <span class="tag ${sp.rarity}">${sp.rarity === "common" ? "Common" : sp.rarity === "rare" ? "Rare — egg only" : "Ultra Rare — egg only"}</span>
       <p>${sp.rarity !== "common" ? "A silhouette. Some companions only arrive by luck." : sp.blurb}</p>`;
     if(sp.rarity === "common"){
-      const b = document.createElement("button"); b.textContent = shelfMode === "swap" ? "Swap to this one" : "Choose";
+      const b = document.createElement("button"); b.textContent = "Choose";
       b.onclick = () => chooseSpecies(sp.id);
       d.appendChild(b);
     }
@@ -405,13 +402,6 @@ function renderShelf(){
   });
 }
 function chooseSpecies(speciesId){
-  if(shelfMode === "swap"){
-    const pet = activePet(); if(!pet) return;
-    pet.speciesId = speciesId; pet.customDesc = null;
-    S.log.unshift("🔄 " + (pet.name || "Your pet") + " swapped to a " + (SPECIES.find(s => s.id === speciesId) || {}).name + ".");
-    save(); banner("🔄 Swapped — same heart, new shape."); renderPet();
-    return;
-  }
   beginPet(speciesId, null);
 }
 function rollSpecies(){
@@ -611,13 +601,6 @@ $("btnCustom").onclick = () => {
       beginPet("custom", desc);
     }
   });
-};
-$("btnSwap").onclick = () => {
-  const pet = activePet(); if(!pet) return;
-  const sp = speciesOf(pet);
-  if(pet.speciesId === "custom"){ alert("A Custom Hatch is one of one — it can't be swapped."); return; }
-  if(sp.rarity !== "common"){ alert("Only Common companions can be swapped."); return; }
-  shelfMode = "swap"; renderShelf(); show("view-shelf");
 };
 $("btnTestXp").onclick = () => {
   const pet = activePet(); if(!pet) return;

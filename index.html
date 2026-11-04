@@ -187,16 +187,6 @@
         <h2 id="petTitle">—</h2>
         <span class="stage-name" id="petStage">—</span>
       </div>
-      <div id="renameRow">
-        <button class="ghost small" id="btnRename" style="width:auto">✎ Rename</button>
-        <div id="renameEdit" class="hidden" style="margin-top:8px">
-          <input type="text" id="renameInput" maxlength="24" placeholder="New name">
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <button class="small" id="btnRenameSave">Save name</button>
-            <button class="ghost small" id="btnRenameCancel">Cancel</button>
-          </div>
-        </div>
-      </div>
       <div class="stage-wrap">
         <img id="petImg" alt="Your pet">
         <div class="big-glyph hidden" id="petGlyph"></div>
@@ -592,11 +582,41 @@ function renderNestGrid(){
       <div class="minilabel">Happiness</div><div class="minibar"><i style="width:${Math.round(p.happy)}%" class="${p.happy < 30 ? "low" : ""}"></i></div>
       ${p.dormant ? '<button class="small" style="margin-top:8px">Wake — free, instant</button>' : ''}`;
     card.onclick = () => {
+      renameForId = null;
       const wasDormant = p.dormant;
       if(wasDormant){ p.dormant = false; p.health = 10; p.happy = 10; }
       S.activeId = p.id; save(); renderPet(); switchTab("pet");
       if(wasDormant) say("wake");
     };
+    if(!VISIT){
+      if(renameForId === p.id){
+        const ed = document.createElement("div");
+        ed.style.marginTop = "8px";
+        ed.innerHTML = `<input type="text" maxlength="24" placeholder="New name">
+          <div style="display:flex; gap:8px; margin-top:8px"><button class="small">Save name</button><button class="ghost small">Cancel</button></div>`;
+        const input = ed.querySelector("input");
+        input.value = p.name || "";
+        const btns = ed.querySelectorAll("button");
+        ed.onclick = e => e.stopPropagation();
+        btns[1].onclick = () => { renameForId = null; renderNestGrid(); };
+        btns[0].onclick = () => {
+          const v = input.value.trim().slice(0, 24);
+          if(v && v !== p.name){
+            S.log.unshift("✏️ " + (p.name || "Your pet") + " is now called " + v + ".");
+            p.name = v; save(); banner("✏️ Renamed — say hello to " + v + ".");
+          }
+          renameForId = null; renderNestGrid(); renderNest();
+        };
+        input.addEventListener("keydown", e => { if(e.key === "Enter") btns[0].click(); });
+        card.appendChild(ed);
+        setTimeout(() => { try{ input.focus(); }catch(e){} }, 0);
+      } else {
+        const b = document.createElement("button");
+        b.className = "ghost small"; b.textContent = "✎ Rename"; b.style.marginTop = "8px";
+        b.onclick = e => { e.stopPropagation(); renameForId = p.id; renderNestGrid(); };
+        card.appendChild(b);
+      }
+    }
     grid.appendChild(card);
   });
   const add = document.createElement("div");
@@ -630,8 +650,6 @@ function renderPet(){
   renderNest();
   $("petTitle").textContent = pet.name || sp.name;
   $("petStage").textContent = sp.name + " · " + STAGES[st] + (pet.dormant ? " · dormant" : "");
-  $("renameRow").classList.toggle("hidden", !!VISIT);
-  if(VISIT || (renameForId && renameForId !== pet.id)) closeRename();
   const img = $("petImg"), gl = $("petGlyph");
   const art = artFor(sp, pet);
   if(art){ img.src = art; img.classList.remove("hidden"); gl.classList.add("hidden"); }
@@ -718,33 +736,8 @@ $("btnName").onclick = () => {
   save(); renderPet();
 };
 $("petName").addEventListener("keydown", e => { if(e.key === "Enter") $("btnName").click(); });
-let renameForId = null;
-function closeRename(){
-  renameForId = null;
-  const ed = $("renameEdit"), btn = $("btnRename");
-  if(ed) ed.classList.add("hidden");
-  if(btn) btn.classList.remove("hidden");
-}
-$("btnRename").onclick = () => {
-  const pet = activePet(); if(!pet || VISIT) return;
-  renameForId = pet.id;
-  $("renameInput").value = pet.name || "";
-  $("renameEdit").classList.remove("hidden");
-  $("btnRename").classList.add("hidden");
-  $("renameInput").focus();
-};
-$("btnRenameCancel").onclick = closeRename;
-$("renameInput").addEventListener("keydown", e => { if(e.key === "Enter") $("btnRenameSave").click(); });
-$("btnRenameSave").onclick = () => {
-  const pet = activePet(); if(!pet || pet.id !== renameForId) return closeRename();
-  const v = $("renameInput").value.trim().slice(0, 24);
-  if(v && v !== pet.name){
-    S.log.unshift("✏️ " + (pet.name || "Your pet") + " is now called " + v + ".");
-    pet.name = v;
-    save(); closeRename(); renderPet();
-    banner("✏️ Renamed — say hello to " + v + ".");
-  } else closeRename();
-};
+let renameForId = null; // pet id whose rename editor is open in the nest grid (renaming lives on the Nest tab now)
+function closeRename(){ renameForId = null; }
 $("btnNameBack").onclick = () => {
   const pet = pendingPet();
   if(pet && !pet.name){

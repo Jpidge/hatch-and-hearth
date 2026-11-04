@@ -1,5 +1,5 @@
 /* Hatch & Hearth service worker — offline shell for the single-file build. */
-const CACHE = "hatch-hearth-v13";
+const CACHE = "hatch-hearth-v14";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./supabase.min.js"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

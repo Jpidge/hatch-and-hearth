@@ -130,6 +130,7 @@
 
   <!-- ============ SHELF / HATCH ============ -->
   <section id="view-shelf">
+    <div class="card hidden" id="accountBar"></div>
     <p class="sub" id="shelfModeNote" style="margin:2px 0 8px"></p>
     <div class="card eggcard" id="eggCard">
       <div class="egg" id="eggEmoji">🥚</div>
@@ -809,6 +810,7 @@ async function sbPullOrMigrate(){
   renderAccount();
 }
 function renderAccount(){
+  renderAccountBar();
   const box = $("accountBox"); if(!box) return;
   if(!sb){ box.innerHTML = "<h3 style='margin:0 0 6px; font-size:15px'>Account</h3><p class='sub' style='margin:0'>Accounts need a connection — your nest is safe on this device meanwhile.</p>"; return; }
   if(SB_USER){
@@ -849,6 +851,17 @@ async function fillCaretakers(){
   $("ccList").innerHTML = html;
   box.querySelectorAll("[data-visit]").forEach(b => b.onclick = () => enterVisit(b.dataset.visit));
   box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await sb.from("co_caretakers").delete().eq("nest_owner", SB_USER.id).eq("caretaker", b.dataset.rm); fillCaretakers(); });
+}
+function renderAccountBar(){
+  const bar = $("accountBar"); if(!bar) return;
+  if(!sb){ bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  if(SB_USER){
+    bar.innerHTML = `<p class="sub" style="margin:0">☁️ Signed in as <b>${SB_USER.email}</b> — your nest syncs to this device.</p>`;
+  } else {
+    bar.innerHTML = `<h3 style="margin:0 0 4px; font-size:15px">Have a nest already?</h3><p class="sub" style="margin:0 0 10px">Sign in and it follows you here. No password — we email you a link.</p><input type="email" id="sbEmailBar" placeholder="you@example.com" style="margin-bottom:8px"><button id="btnSignInBar">Email me a sign-in link</button><p class="sub" id="sbMsgBar" style="margin:8px 0 0"></p>`;
+    $("btnSignInBar").onclick = async () => { const em = $("sbEmailBar").value.trim(); if(!em) return; const { error } = await sb.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.origin + location.pathname } }); $("sbMsgBar").textContent = error ? "That didn't send — check the address and try again." : "📬 Link sent — open it on this device and you're in."; };
+  }
 }
 async function enterVisit(ownerId){
   if(!sb || !SB_USER || VISIT) return;

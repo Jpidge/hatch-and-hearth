@@ -70,9 +70,9 @@
   .stage-wrap .big-glyph{width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:120px; background:radial-gradient(80% 80% at 50% 30%, var(--surface), var(--surface-alt))}
   .bob{animation:bob 3.4s ease-in-out infinite; will-change:transform}
   @keyframes bob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10px) scale(1.015)}}
-  .eyelid{position:absolute; border-radius:50%; pointer-events:none; background:radial-gradient(50% 50% at 50% 45%, rgba(26,17,10,.97) 52%, rgba(26,17,10,.85) 72%, rgba(26,17,10,0) 100%); transform-origin:50% 0; transform:scaleY(.04); animation:eyelid 5.2s infinite}
-  @keyframes eyelid{0%,90%,100%{transform:scaleY(.04)}93.5%,95.5%{transform:scaleY(1.1)}98.5%{transform:scaleY(.04)}}
-  .eyelid.closed{animation:none; transform:scaleY(1.1)}
+  .eyelid{position:absolute; border-radius:50%; pointer-events:none; background:rgba(24,15,8,.42); -webkit-backdrop-filter:brightness(.42) saturate(.75) blur(1.6px); backdrop-filter:brightness(.42) saturate(.75) blur(1.6px); -webkit-mask-image:radial-gradient(closest-side, #000 52%, transparent 98%); mask-image:radial-gradient(closest-side, #000 52%, transparent 98%); transform-origin:50% 0; transform:scaleY(0); animation:eyelid 5.2s infinite}
+  @keyframes eyelid{0%,92%,100%{transform:scaleY(0)}94.5%,96%{transform:scaleY(1.06)}98.5%{transform:scaleY(0)}}
+  .eyelid.closed{animation:none; transform:scaleY(1.06)}
   .bubble{background:var(--surface-alt); color:var(--text); border-radius:14px; padding:10px 12px; font-size:15px; margin:12px 0 0; position:relative}
   .bubble:before{content:""; position:absolute; top:-8px; left:34px; border:9px solid transparent; border-bottom-color:var(--surface-alt); border-top:0}
   .bubble .glyphs{color:var(--accent-strong); letter-spacing:2px; font-size:12px; display:block; margin-bottom:2px}

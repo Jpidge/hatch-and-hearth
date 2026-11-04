@@ -6,7 +6,7 @@
 
 ## The companions
 
-12 species: **8 Common · 3 Rare · 1 Ultra Rare**. Your first pet is free — pick a Common from the shelf or trust the **Mystery Egg** (odds always shown in-app: 69.5% / 29.5% / 1%). Rares and the Ultra are egg-only and never sold by pick. Portraits are painted as matched sets, one per growth stage.
+12 species: **8 Common · 3 Rare · 1 Ultra Rare**. Your first pet is free — pick a Common from the shelf or trust the **Mystery Egg** (odds: 69.5% for common / 29.5% for rare / 1% for ultra rare). Rares and the Ultra are egg-only and never sold by pick. Portraits are painted as matched sets, one per growth stage.
 
 ## The care model
 

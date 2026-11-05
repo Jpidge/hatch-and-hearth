@@ -101,6 +101,8 @@
   .need.wishneed{border-color:var(--accent)}
   .hearts{position:absolute; inset:0; pointer-events:none; overflow:hidden}
   .visit-return{ background:var(--sage); color:#fff; margin:0 0 12px; font-size:15px }
+  .npet{min-width:0}
+  #petTitle, .pethead h2, .npet h4, .log li, .banner, .wish{overflow-wrap:anywhere}
   .hearts span{position:absolute; bottom:38%; font-size:22px; animation:floatUp 1.4s ease-out forwards}
   @keyframes floatUp{to{transform:translateY(-130px); opacity:0}}
   .log{font-size:13px; color:var(--dim); margin:0; padding-left:16px}
@@ -133,7 +135,7 @@
   .tabbar button::after{content:""; width:4px; height:4px; border-radius:99px; background:currentColor; opacity:0; margin-top:1px}
   .tabbar button.on::after{opacity:1}
   .tabbar button.on{color:var(--accent); background:transparent}
-  .nestgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .nestgrid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px}
   .npet{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:10px; text-align:center; cursor:pointer}
   .npet.active{border-color:var(--accent)}
   .npet.dormant{opacity:.75}
